@@ -1,2 +1,14 @@
 # fin-project
-Code for some financial project, eventually to be turned into a website
+Financial projects
+Necessary (Python) packages:
+
+yfinance
+pandas
+numpy
+datetime
+warnings
+matplotlib
+scipy
+
+
+
