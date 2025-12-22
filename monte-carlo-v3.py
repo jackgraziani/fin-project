@@ -57,7 +57,7 @@ def calculations():
     ax.set_facecolor('#121212')
 
     # Plot muted simulation paths (light grey/white with low opacity)
-    ax.plot(paths[:100].T, lw=0.4, color='white', alpha=0.2)
+    ax.plot(paths[:100].T, lw=0.4, color='white', alpha=0.225)
 
     # Reference Levels (Neon colors for high contrast)
     ax.axhline(S0, color='white', lw=1, label=f'Initial Price (${S0})', alpha=0.7)
