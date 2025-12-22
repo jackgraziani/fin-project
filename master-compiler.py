@@ -412,8 +412,8 @@ def main():
             print("Invalid number of shares. Try again.")
 
     if not portfolio_data["tickers"]:
-        print("\nNo input detected. Using default example portfolio.")
-        portfolio_data = {"tickers": ["AAPL", "GOOG", "TSLA"], "num_shares": [10, 5, 20]}
+        print("\nNo input detected. Using default example ""portfolio.")
+        portfolio_data = {"tickers": ["CF", "BKR", "MRK", "PINS"], "num_shares": [11, 11, 11, 11]}
 
     # 2. Run Aggregate Portfolio Analysis
     run_portfolio_analysis(portfolio_data)
