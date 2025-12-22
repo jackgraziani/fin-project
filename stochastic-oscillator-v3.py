@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 N_PERIODS = 14   # Lookback
 K_SMOOTH = 3     # First smoothing (Fast %D)
 D_SMOOTH = 3     # Second smoothing (Slow %D)
-SMA_FILTER = 50  # Trend Filter Period
+SMA_FILTER = 40  # Trend Filter Period
 
 OVERSOLD_LEVEL = 20
 OVERBOUGHT_LEVEL = 80
@@ -90,7 +90,7 @@ def plot_results(df, ticker):
     plt.show()
 
 if __name__ == '__main__':
-    ticker = input("Enter ticker (e.g. SPY): ").upper()
+    ticker = input("Enter ticker: ").upper()
     data = fetch_historical_data(ticker)
     data = calculate_indicators(data)
     data = generate_signals(data)
