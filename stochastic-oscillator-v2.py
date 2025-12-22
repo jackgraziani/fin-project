@@ -74,10 +74,24 @@ def generate_stochastic_signals(df, oversold=20, overbought=80):
     
     return df
 
+def input_user_ticker():
+    still_running = True
+    while still_running:
+        ticker = input("Enter a ticker: ")
+        data = yf.Ticker(ticker)
+        history = data.history(period="1d")
+        if history.empty == True:
+            print("Please enter a valid ticker.")
+        else:
+            still_running = False
+    return ticker
+
 # --- 4. MAIN EXECUTION ---
 if __name__ == '__main__':
     # 1. Get the data
-    price_data = fetch_historical_data(TICKER)
+    ticker = input_user_ticker()
+
+    price_data = fetch_historical_data(ticker)
 
     # 2. Calculate the indicator
     indicator_data = calculate_stochastic_oscillator(price_data, N_PERIODS, M_PERIODS)
@@ -87,7 +101,7 @@ if __name__ == '__main__':
 
     # 4. Print the final output
     print("\n--- Final Stochastic Trading Results ---")
-    print(f"Ticker: {TICKER} | %K Period: {N_PERIODS} | %D Period: {M_PERIODS}")
+    print(f"Ticker: {ticker} | %K Period: {N_PERIODS} | %D Period: {M_PERIODS}")
     print("\nDisplaying the last 10 periods with Trend and Divergence insights:\n")
     
     # Filter columns for readability
