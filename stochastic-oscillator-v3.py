@@ -92,8 +92,16 @@ def plot_stochastic_results(df, ticker):
     sells = df[df['Signal'] == 'Sell']
     ax1.scatter(sells.index, sells['Close'], marker='v', color='#ff3333', s=100, label='Sell Signal', zorder=5)
 
-    ax1.set_title(f"{ticker} Technical Analysis", fontsize=16, color='white')
+    # Set Title (Updated specifically)
+    ax1.set_title(f"{ticker}: Stochastic Oscillator Analysis", fontsize=16, color='white', pad=20)
     ax1.set_ylabel('Price (USD)')
+    
+    # Reverted: Auto-scale the Y-axis based on price range instead of starting at 0
+    # We add a small 5% margin for visual breathing room
+    y_min = df['Close'].min() * 0.95
+    y_max = df['Close'].max() * 1.05
+    ax1.set_ylim(y_min, y_max) 
+    
     ax1.legend(loc='upper left')
     ax1.grid(color='gray', linestyle='--', alpha=0.3)
 
