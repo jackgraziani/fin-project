@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 S0 = 100          # Initial stock price
 K = 105           # Strike price
 T = 1.0           # Time to maturity (1 year)
-RFR = 0.05        # Risk-free rate (5%)
+RFR = 0.04        # Risk-free rate
 SIGMA = 0.2       # Volatility (20%)
 N_STEPS = 252     # Trading days in a year
 N_PATHS = 10000   # Number of simulations
@@ -46,7 +46,7 @@ def calculations():
     ax.set_facecolor('#121212')
 
     # Plot muted simulation paths (light grey/white with low opacity)
-    ax.plot(paths[:100].T, lw=0.4, color='white', alpha=0.15)
+    ax.plot(paths[:100].T, lw=0.4, color='white', alpha=0.2)
 
     # Reference Levels (Neon colors for high contrast)
     ax.axhline(S0, color='white', lw=1, label=f'Initial Price (${S0})', alpha=0.7)
