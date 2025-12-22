@@ -10,7 +10,7 @@ OVERSOLD_LEVEL = 20
 OVERBOUGHT_LEVEL = 80
 
 # --- 1. DATA RETRIEVAL FUNCTION ---
-def fetch_historical_data(ticker):
+def fetch_historical_dataaapl(ticker):
     # Fetching 60d for enough lookback, but we will plot a clear window
     stock_data = yf.download(ticker, period="60d", interval="1d", progress=False)
     if isinstance(stock_data.columns, pd.MultiIndex):
