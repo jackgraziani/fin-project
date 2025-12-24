@@ -202,7 +202,6 @@ def run_monte_carlo_analysis(ticker):
     K = S0 * 1.05  
     T = 1.0
     N_STEPS = 252
-    # Using 2000 paths for better performance in Streamlit, can be increased for accuracy
     N_PATHS = 2000 
     DT = T / N_STEPS
 
@@ -214,7 +213,6 @@ def run_monte_carlo_analysis(ticker):
     paths[:, 1:] = S0 * np.cumprod(daily_returns, axis=1)
     
     # --- Option Pricing (Longstaff-Schwartz / LSM) ---
-    # Initialize cashflows at maturity (European payoff)
     cashflows = np.maximum(paths[:, -1] - K, 0)
     discount_factor = np.exp(-RFR * DT)
 
@@ -257,7 +255,6 @@ def run_monte_carlo_analysis(ticker):
     ax.axhline(breakeven, color='#00ff88', linestyle=':', lw=2, label=f'Risk-Adjusted Breakeven (${breakeven:.2f})')
 
     # --- Annotations & Metadata ---
-    # Main Stats Box
     stats_text = (f"LSM American Price: ${option_price:.2f}\n"
                   f"B-S (Euro) Price:   ${bs_price:.2f}\n"
                   f"Prob. of Exercise:  {probability_itm:.1%}\n"
@@ -267,7 +264,6 @@ def run_monte_carlo_analysis(ticker):
             fontsize=10, verticalalignment='top', family='monospace',
             bbox=dict(boxstyle='round,pad=0.6', facecolor='#1e1e1e', edgecolor='#444444', alpha=0.9))
 
-    # Subtle Metadata
     metadata_text = (f"RFR: {RFR:.1%}\n"
                      "Pricing Model: Longstaff-Schwartz (LSM)\n"
                      "Instrument: American Call Option")
@@ -292,6 +288,14 @@ def run_monte_carlo_analysis(ticker):
 
 @st.cache_data
 def run_stochastic_analysis(ticker):
+    # Parameters strictly matching v3
+    N_PERIODS = 14
+    K_SMOOTH = 3
+    D_SMOOTH = 3
+    SMA_FILTER = 40
+    OVERSOLD = 20
+    OVERBOUGHT = 80
+
     stock_data = yf.download(ticker, period="1y", interval="1d", progress=False)
     if stock_data.empty: return None
 
@@ -300,34 +304,57 @@ def run_stochastic_analysis(ticker):
 
     df = stock_data[['High', 'Low', 'Close']].copy()
     
-    lowest_low = df['Low'].rolling(window=14).min()
-    highest_high = df['High'].rolling(window=14).max()
+    # --- Indicator Calculation ---
+    lowest_low = df['Low'].rolling(window=N_PERIODS).min()
+    highest_high = df['High'].rolling(window=N_PERIODS).max()
     fast_k = 100 * ((df['Close'] - lowest_low) / (highest_high - lowest_low))
-    df['Slow_%K'] = fast_k.rolling(window=3).mean()
-    df['Slow_%D'] = df['Slow_%K'].rolling(window=3).mean()
-    df['SMA_Trend'] = df['Close'].rolling(window=40).mean()
+    
+    df['Slow_%K'] = fast_k.rolling(window=K_SMOOTH).mean()
+    df['Slow_%D'] = df['Slow_%K'].rolling(window=D_SMOOTH).mean()
+    df['SMA_Trend'] = df['Close'].rolling(window=SMA_FILTER).mean()
+    
     df = df.dropna()
 
-    buy_cond = ((df['Slow_%K'] > df['Slow_%D']) & (df['Slow_%K'].shift(1) < df['Slow_%D'].shift(1)) & (df['Slow_%D'] < 20))
-    sell_cond = ((df['Slow_%K'] < df['Slow_%D']) & (df['Slow_%K'].shift(1) > df['Slow_%D'].shift(1)) & (df['Slow_%D'] > 80))
+    # --- Signal Logic (Strict Match to v3) ---
+    # Buy: Crossover + Oversold + PRICE > TREND SMA (Buying the dip in uptrend)
+    buy_cond = (
+        (df['Slow_%K'] > df['Slow_%D']) & 
+        (df['Slow_%K'].shift(1) < df['Slow_%D'].shift(1)) & 
+        (df['Slow_%D'] < OVERSOLD) &
+        (df['Close'] > df['SMA_Trend'])
+    )
+
+    # Sell: Crossover + Overbought (No trend filter for selling)
+    sell_cond = (
+        (df['Slow_%K'] < df['Slow_%D']) & 
+        (df['Slow_%K'].shift(1) > df['Slow_%D'].shift(1)) & 
+        (df['Slow_%D'] > OVERBOUGHT)
+    )
     
+    # --- Plotting (Strict Match to Figure_2.png) ---
     plt.style.use('dark_background')
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True, height_ratios=[2, 1])
     
-    ax1.plot(df.index, df['Close'], color='cyan', alpha=0.8)
-    ax1.plot(df.index, df['SMA_Trend'], color='yellow', alpha=0.6, linestyle='--')
+    # Plot 1: Price, Trend, Signals
+    ax1.plot(df.index, df['Close'], color='cyan', alpha=0.9, label='Price')
+    ax1.plot(df.index, df['SMA_Trend'], color='yellow', alpha=0.6, linestyle='--', label=f'SMA {SMA_FILTER} (Trend)')
     
     buys = df[buy_cond]
     sells = df[sell_cond]
-    ax1.scatter(buys.index, buys['Close'], marker='^', color='#00ff00', s=80, zorder=5)
-    ax1.scatter(sells.index, sells['Close'], marker='v', color='#ff3333', s=80, zorder=5)
-    ax1.set_title(f"{ticker} Stochastic Strategy")
-
-    ax2.plot(df.index, df['Slow_%K'], color='white')
-    ax2.plot(df.index, df['Slow_%D'], color='orange')
-    ax2.axhline(80, color='red', linestyle='--', alpha=0.5)
-    ax2.axhline(20, color='green', linestyle='--', alpha=0.5)
+    ax1.scatter(buys.index, buys['Close'], marker='^', color='#00ff00', s=100, label='Buy (Trend Filtered)', zorder=5)
+    ax1.scatter(sells.index, sells['Close'], marker='v', color='#ff3333', s=100, label='Sell', zorder=5)
     
+    ax1.set_title(f"{ticker} - Slow Stochastic Strategy")
+    ax1.legend(loc='upper left', fontsize=8)
+
+    # Plot 2: Oscillator
+    ax2.plot(df.index, df['Slow_%K'], color='white', label='Slow %K')
+    ax2.plot(df.index, df['Slow_%D'], color='orange', label='Slow %D')
+    ax2.axhline(OVERBOUGHT, color='red', linestyle='--', alpha=0.6)
+    ax2.axhline(OVERSOLD, color='green', linestyle='--', alpha=0.6)
+    ax2.legend(loc='upper right', fontsize=8)
+    
+    plt.tight_layout()
     return fig
 
 # ==========================================
