@@ -148,8 +148,8 @@ def run_portfolio_analysis(portfolio_data, benchmark_ticker="^GSPC"):
 
     # Metrics Display
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Portfolio Return", f"{port_return:.2%}", f"{dollar_change:.2f}")
-    c2.metric("Benchmark Return", f"{bench_return:.2%}")
+    c1.metric("Portfolio Return", f"{port_return:.2%}", f"${dollar_change:.2f}")
+    c2.metric("S&P 500 Return", f"{bench_return:.2%}")
     c3.metric("Alpha", f"{daily_alpha:.2%}")
     c4.metric("Beta", f"{beta:.2f}")
 
