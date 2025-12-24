@@ -186,18 +186,31 @@ def run_portfolio_analysis(portfolio_data, benchmark_ticker="^GSPC"):
 # ==========================================
 # MODULE 2: MONTE CARLO OPTION PRICING
 # ==========================================
+def calculate_black_scholes(S, K, T, r, sigma):
+    """
+    Calculates the theoretical price of a European Call option 
+    using the Black-Scholes-Merton formula.
+    """
+    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    call_price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+    return call_price
 
 def run_monte_carlo_analysis(ticker):
     S0, SIGMA = get_current_price_and_volatility(ticker)
     if S0 is None: return
 
     RFR = get_risk_free_rate()
-    K = S0 * 1.05  
-    T = 1.0
+    K = S0 * 1.05  # Strike Price is 5% OTM
+    T = 1.0        # 1 Year to expiration
     N_STEPS = 252
     N_PATHS = 2000 
     DT = T / N_STEPS
 
+    # --- Black-Scholes Calculation ---
+    bs_price = calculate_black_scholes(S0, K, T, RFR, SIGMA)
+
+    # --- Monte Carlo Simulation ---
     Z = np.random.standard_normal((N_PATHS, N_STEPS))
     daily_returns = np.exp((RFR - 0.5 * SIGMA**2) * DT + SIGMA * np.sqrt(DT) * Z)
     paths = np.zeros((N_PATHS, N_STEPS + 1))
@@ -205,18 +218,29 @@ def run_monte_carlo_analysis(ticker):
     paths[:, 1:] = S0 * np.cumprod(daily_returns, axis=1)
     
     payoffs = np.maximum(paths[:, -1] - K, 0)
-    option_price = np.exp(-RFR * T) * np.mean(payoffs)
-    probability_profit = np.count_nonzero(payoffs > option_price) / N_PATHS
+    mc_option_price = np.exp(-RFR * T) * np.mean(payoffs)
+    probability_profit = np.count_nonzero(payoffs > mc_option_price) / N_PATHS
 
+    # --- Plotting ---
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(paths[:50].T, lw=0.4, color='white', alpha=0.3)
-    ax.axhline(S0, color='white', linestyle='--', label='Current Price')
-    ax.axhline(K, color='red', linestyle='--', label='Strike (+5%)')
-    ax.set_title(f"{ticker}: Monte Carlo (Est. Call Price: ${option_price:.2f})")
-    ax.legend()
     
-    return fig, option_price, probability_profit
+    # Plot first 50 paths
+    ax.plot(paths[:50].T, lw=0.4, color='white', alpha=0.3)
+    
+    # Reference Lines
+    ax.axhline(S0, color='white', linestyle='--', label=f'Current: ${S0:.2f}')
+    ax.axhline(K, color='red', linestyle='--', label=f'Strike: ${K:.2f}')
+    
+    # Title
+    ax.set_title(f"{ticker}: Monte Carlo vs Black-Scholes")
+    ax.set_xlabel("Trading Days (Steps)")
+    ax.set_ylabel("Stock Price ($)")
+    
+    # Legend
+    ax.legend(loc='upper left')
+    
+    return fig, mc_option_price, probability_profit, bs_price
 
 # ==========================================
 # MODULE 3: STOCHASTIC OSCILLATOR
@@ -254,6 +278,11 @@ def run_stochastic_analysis(ticker):
     ax1.scatter(buys.index, buys['Close'], marker='^', color='#00ff00', s=80, zorder=5)
     ax1.scatter(sells.index, sells['Close'], marker='v', color='#ff3333', s=80, zorder=5)
     ax1.set_title(f"{ticker} Stochastic Strategy")
+    
+    # --- LABELS ADDED HERE ---
+    ax1.set_ylabel("Price ($)")
+    ax2.set_xlabel("Date")
+    ax2.set_ylabel("Oscillator Value")
 
     ax2.plot(df.index, df['Slow_%K'], color='white')
     ax2.plot(df.index, df['Slow_%D'], color='orange')
@@ -436,9 +465,17 @@ if run_btn:
                     st.write("#### Monte Carlo Simulation")
                     res = run_monte_carlo_analysis(ticker)
                     if res:
-                        fig_mc, price, prob = res
+                        # Unpack 4 values now instead of 3
+                        fig_mc, mc_price, prob, bs_price = res
+                        
                         st.pyplot(fig_mc)
-                        st.info(f"Est. Option Price: ${price:.2f} | Prob Profit: {prob:.1%}")
+                        
+                        # Display Comparison Metrics
+                        st.metric("Monte Carlo Est.", f"${mc_price:.2f}", 
+                                  delta=f"{mc_price - bs_price:.2f} vs BS")
+                        
+                        st.caption(f"Black-Scholes Model Price: ${bs_price:.2f}")
+                        st.info(f"Prob. of Profit: {prob:.1%}")
                 
                 st.header("3) Financial Health Analysis (Sector Comparison)")
                 df_fund, sector = get_fundamental_comparison(ticker)
