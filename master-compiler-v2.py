@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import norm
 from datetime import datetime, time
 import warnings
-from typing import Optional, Dict, Any, List, Union # Added from ttfh-v2
+from typing import Optional, Dict, Any, List, Union
 
 # --- GLOBAL CONFIGURATION ---
 TRADING_DAYS_PER_YEAR = 252
