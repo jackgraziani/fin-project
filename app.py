@@ -184,63 +184,107 @@ def run_portfolio_analysis(portfolio_data, benchmark_ticker="^GSPC"):
     st.pyplot(fig)
 
 # ==========================================
-# MODULE 2: MONTE CARLO OPTION PRICING
+# MODULE 2: MONTE CARLO OPTION PRICING (LSM)
 # ==========================================
-def calculate_black_scholes(S, K, T, r, sigma):
-    """
-    Calculates the theoretical price of a European Call option 
-    using the Black-Scholes-Merton formula.
-    """
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+
+def black_scholes_call(S, K, T, r, sigma):
+    """Calculates the theoretical European Call price for benchmark comparison."""
+    # Note: For non-dividend paying stocks, American Call Price ~= European Call Price
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
-    call_price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
-    return call_price
+    return S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
 
 def run_monte_carlo_analysis(ticker):
     S0, SIGMA = get_current_price_and_volatility(ticker)
-    if S0 is None: return
+    if S0 is None: return None
 
     RFR = get_risk_free_rate()
-    K = S0 * 1.05  # Strike Price is 5% OTM
-    T = 1.0        # 1 Year to expiration
+    K = S0 * 1.05  
+    T = 1.0
     N_STEPS = 252
+    # Using 2000 paths for better performance in Streamlit, can be increased for accuracy
     N_PATHS = 2000 
     DT = T / N_STEPS
 
-    # --- Black-Scholes Calculation ---
-    bs_price = calculate_black_scholes(S0, K, T, RFR, SIGMA)
-
-    # --- Monte Carlo Simulation ---
+    # --- Simulation Engine ---
     Z = np.random.standard_normal((N_PATHS, N_STEPS))
     daily_returns = np.exp((RFR - 0.5 * SIGMA**2) * DT + SIGMA * np.sqrt(DT) * Z)
     paths = np.zeros((N_PATHS, N_STEPS + 1))
     paths[:, 0] = S0
     paths[:, 1:] = S0 * np.cumprod(daily_returns, axis=1)
     
-    payoffs = np.maximum(paths[:, -1] - K, 0)
-    mc_option_price = np.exp(-RFR * T) * np.mean(payoffs)
-    probability_profit = np.count_nonzero(payoffs > mc_option_price) / N_PATHS
+    # --- Option Pricing (Longstaff-Schwartz / LSM) ---
+    # Initialize cashflows at maturity (European payoff)
+    cashflows = np.maximum(paths[:, -1] - K, 0)
+    discount_factor = np.exp(-RFR * DT)
+
+    # Backward Induction Loop
+    for t in range(N_STEPS - 1, 0, -1):
+        cashflows = cashflows * discount_factor
+        S_t = paths[:, t]
+        itm_mask = S_t > K
+        
+        if np.count_nonzero(itm_mask) > 0:
+            X = S_t[itm_mask]
+            Y = cashflows[itm_mask]
+            coeffs = np.polyfit(X, Y, 2)
+            continuation_value = np.polyval(coeffs, X)
+            exercise_value = X - K
+            exercise_indices = exercise_value > continuation_value
+            full_indices = np.where(itm_mask)[0]
+            paths_to_update = full_indices[exercise_indices]
+            cashflows[paths_to_update] = exercise_value[exercise_indices]
+
+    # Calculate final prices and metrics
+    option_price = np.mean(cashflows * discount_factor)
+    bs_price = black_scholes_call(S0, K, T, RFR, SIGMA)
+    breakeven = K + option_price
+    probability_itm = np.count_nonzero(cashflows > 0) / N_PATHS
+    probability_profit = np.count_nonzero(cashflows > option_price) / N_PATHS
 
     # --- Plotting ---
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_facecolor('#121212')
+    ax.set_facecolor('#121212')
+
+    # Plot muted simulation paths
+    ax.plot(paths[:100].T, lw=0.4, color='white', alpha=0.225)
+
+    # Reference Levels
+    ax.axhline(S0, color='white', lw=1, label=f'Initial Price (${S0:.2f})', alpha=0.7)
+    ax.axhline(K, color='#ff4d4d', linestyle='--', lw=2, label=f'Strike Price (${K:.2f})')
+    ax.axhline(breakeven, color='#00ff88', linestyle=':', lw=2, label=f'Risk-Adjusted Breakeven (${breakeven:.2f})')
+
+    # --- Annotations & Metadata ---
+    # Main Stats Box
+    stats_text = (f"LSM American Price: ${option_price:.2f}\n"
+                  f"B-S (Euro) Price:   ${bs_price:.2f}\n"
+                  f"Prob. of Exercise:  {probability_itm:.1%}\n"
+                  f"Prob. of Profit:    {probability_profit:.1%}")
     
-    # Plot first 50 paths
-    ax.plot(paths[:50].T, lw=0.4, color='white', alpha=0.3)
+    ax.text(0.02, 0.96, stats_text, transform=ax.transAxes, 
+            fontsize=10, verticalalignment='top', family='monospace',
+            bbox=dict(boxstyle='round,pad=0.6', facecolor='#1e1e1e', edgecolor='#444444', alpha=0.9))
+
+    # Subtle Metadata
+    metadata_text = (f"RFR: {RFR:.1%}\n"
+                     "Pricing Model: Longstaff-Schwartz (LSM)\n"
+                     "Instrument: American Call Option")
+
+    ax.text(0.98, 0.02, metadata_text, transform=ax.transAxes, 
+            fontsize=8, color='#888888', verticalalignment='bottom', 
+            horizontalalignment='right', style='italic')
+
+    # Chart Polish
+    ax.set_title(f"{ticker}: Monte Carlo (LSM) Option Analysis", fontsize=14, fontweight='bold', pad=20)
+    ax.set_xlabel("Trading Days", fontsize=10, color='#cccccc')
+    ax.set_ylabel("Stock Price ($)", fontsize=10, color='#cccccc')
+    ax.grid(color='#333333', linestyle='--', alpha=0.5)
     
-    # Reference Lines
-    ax.axhline(S0, color='white', linestyle='--', label=f'Current: ${S0:.2f}')
-    ax.axhline(K, color='red', linestyle='--', label=f'Strike: ${K:.2f}')
+    ax.legend(loc='upper right', facecolor='#1e1e1e', edgecolor='#444444', fontsize=9)
     
-    # Title
-    ax.set_title(f"{ticker}: Monte Carlo vs Black-Scholes")
-    ax.set_xlabel("Trading Days (Steps)")
-    ax.set_ylabel("Stock Price ($)")
-    
-    # Legend
-    ax.legend(loc='upper left')
-    
-    return fig, mc_option_price, probability_profit, bs_price
+    return fig
 
 # ==========================================
 # MODULE 3: STOCHASTIC OSCILLATOR
@@ -278,11 +322,6 @@ def run_stochastic_analysis(ticker):
     ax1.scatter(buys.index, buys['Close'], marker='^', color='#00ff00', s=80, zorder=5)
     ax1.scatter(sells.index, sells['Close'], marker='v', color='#ff3333', s=80, zorder=5)
     ax1.set_title(f"{ticker} Stochastic Strategy")
-    
-    # --- LABELS ADDED HERE ---
-    ax1.set_ylabel("Price ($)")
-    ax2.set_xlabel("Date")
-    ax2.set_ylabel("Oscillator Value")
 
     ax2.plot(df.index, df['Slow_%K'], color='white')
     ax2.plot(df.index, df['Slow_%D'], color='orange')
@@ -462,20 +501,11 @@ if run_btn:
                     else: st.warning("No data.")
 
                 with col2:
-                    st.write("#### Monte Carlo Simulation")
-                    res = run_monte_carlo_analysis(ticker)
-                    if res:
-                        # Unpack 4 values now instead of 3
-                        fig_mc, mc_price, prob, bs_price = res
-                        
+                    st.write("#### Monte Carlo Simulation (LSM)")
+                    # Updated to only expect a figure return
+                    fig_mc = run_monte_carlo_analysis(ticker)
+                    if fig_mc:
                         st.pyplot(fig_mc)
-                        
-                        # Display Comparison Metrics
-                        st.metric("Monte Carlo Est.", f"${mc_price:.2f}", 
-                                  delta=f"{mc_price - bs_price:.2f} vs B-S")
-                        
-                        st.caption(f"Black-Scholes Model Price: ${bs_price:.2f}")
-                        st.info(f"Prob. of Profit (Risk Adj.): {prob:.1%}")
                 
                 st.header("3) Financial Health Analysis (Sector Comparison)")
                 df_fund, sector = get_fundamental_comparison(ticker)
