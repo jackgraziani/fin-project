@@ -149,14 +149,14 @@ def run_portfolio_analysis(portfolio_data, benchmark_ticker="^GSPC"):
     # Metrics Display
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Portfolio Return", f"{port_return:.2%}", f"${dollar_change:.2f}")
-    c2.metric("S&P 500 Return", f"{bench_return:.2%}")
+    c2.metric("Benchmark Return", f"{bench_return:.2%}")
     c3.metric("Alpha", f"{daily_alpha:.2%}")
     c4.metric("Beta", f"{beta:.2f}")
 
     # Plot
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(9, 4))
-    labels = ['Portfolio', 'Benchmark', 'Alpha']
+    labels = ['Portfolio', 'S&P 500', 'Alpha']
     values = [port_return * 100, bench_return * 100, daily_alpha * 100]
     colors = ['#3498db', '#95a5a6', '#2ecc71' if daily_alpha >= 0 else '#e74c3c']
     bars = ax.bar(labels, values, color=colors)
