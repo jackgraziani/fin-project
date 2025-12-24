@@ -472,10 +472,10 @@ if run_btn:
                         
                         # Display Comparison Metrics
                         st.metric("Monte Carlo Est.", f"${mc_price:.2f}", 
-                                  delta=f"{mc_price - bs_price:.2f} vs BS")
+                                  delta=f"{mc_price - bs_price:.2f} vs B-S")
                         
                         st.caption(f"Black-Scholes Model Price: ${bs_price:.2f}")
-                        st.info(f"Prob. of Profit: {prob:.1%}")
+                        st.info(f"Prob. of Profit (Risk Adj.): {prob:.1%}")
                 
                 st.header("3) Financial Health Analysis (Sector Comparison)")
                 df_fund, sector = get_fundamental_comparison(ticker)
