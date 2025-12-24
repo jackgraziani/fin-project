@@ -336,7 +336,7 @@ def run_stochastic_analysis(ticker):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True, height_ratios=[2, 1])
     
     # Plot 1: Price, Trend, Signals
-    ax1.plot(df.index, df['Close'], color='cyan', alpha=0.9, label='Price')
+    ax1.plot(df.index, df['Close'], color='cyan', alpha=0.9, label='Price (USD)')
     ax1.plot(df.index, df['SMA_Trend'], color='yellow', alpha=0.6, linestyle='--', label=f'SMA {SMA_FILTER} (Trend)')
     
     buys = df[buy_cond]
